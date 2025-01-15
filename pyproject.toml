@@ -1,0 +1,19 @@
+[project]
+name = "tr2-2024-2-grupo10"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "hrrocha0",email = "99548553+hrrocha0@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+]
+
+[tool.poetry]
+packages = [{include = "tr2_2024"}]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
