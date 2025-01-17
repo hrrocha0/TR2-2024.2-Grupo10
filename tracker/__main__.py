@@ -2,9 +2,12 @@ import sys
 
 from socket import *
 from threading import *
+from message import *
 
 HOST = '127.0.0.1'
 PORT = 8000
+
+__users: dict[str, str] = {}
 
 
 def main() -> None:
@@ -52,7 +55,13 @@ def handle_peer(client_socket: socket, client_address: (str, int)) -> None:
     :param client_address: O endereço IP e porta do peer.
     :return: None
     """
-    # TODO
+    while True:
+        encoded = client_socket.recv(1024)
+        request = Message.from_utf8(encoded)
+
+        match request.message_type:
+            case _:
+                pass
 
 
 if __name__ == '__main__':
