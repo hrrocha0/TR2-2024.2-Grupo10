@@ -3,5 +3,5 @@
 ## Integrantes
 
 - Henrique Rodrigues Rocha - 211036061
--
+- Thiago Maciel - 180131699
 -
