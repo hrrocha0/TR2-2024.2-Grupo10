@@ -18,7 +18,6 @@ def iniciar_tracker() -> None:
         servidor_socket = criar_socket(HOST, PORT)
         print(f"Tracker ativo em {HOST}:{PORT}...")
 
-        # Thread para remover peers inativos
         Thread(target=remover_peers_inativos, daemon=True).start()
 
         while True:
@@ -32,16 +31,16 @@ def iniciar_tracker() -> None:
 
 def criar_socket(host: str, port: int) -> socket:
     """
-    Cria um socket TCP de servidor com o endereço e porta especificados.
+    Cria um socket TCP de servidor com o endereço e porta especifica.
     """
     servidor_socket = socket(AF_INET, SOCK_STREAM)
     servidor_socket.bind((host, port))
     servidor_socket.listen(5)
     return servidor_socket
 
-def lidar_com_peer(cliente_socket: socket, endereco_cliente: (str, int)) -> None:
+def lidar_com_peer(cliente_socket: socket, endereco_cliente: tuple[str, int]) -> None:
     """
-    Lida com as requisições de um peer.
+    Gerencia as comunicações entre tracker e peer
     """
     try:
         while True:
@@ -50,7 +49,8 @@ def lidar_com_peer(cliente_socket: socket, endereco_cliente: (str, int)) -> None
                 break
 
             requisicao = json.loads(dados)
-            resposta = processar_requisicao(requisicao, endereco_cliente)
+            peer_port = requisicao.get("peer_port", cliente_socket.getpeername()[1])
+            resposta = processar_requisicao(requisicao, endereco_cliente, peer_port)
             cliente_socket.send(resposta.encode('utf-8'))
 
     except Exception as e:
@@ -59,38 +59,44 @@ def lidar_com_peer(cliente_socket: socket, endereco_cliente: (str, int)) -> None
     finally:
         cliente_socket.close()
 
-def processar_requisicao(requisicao: dict, endereco_cliente: (str, int)) -> str:
+
+def processar_requisicao(requisicao: dict, endereco_cliente: tuple[str, int], peer_port: int) -> str:
     """
-    Processa diferentes tipos de requisições do peer.
+    Processa as requisições do peer e retorna a resposta
     """
     match requisicao.get("tipo"):
         case "registro":
             peer_id = requisicao.get("peer_id")
             arquivos = requisicao.get("arquivos", [])
-            return lidar_com_registro(peer_id, arquivos, endereco_cliente)
+            return lidar_com_registro(peer_id, arquivos, endereco_cliente, peer_port)
 
         case "busca":
             nome_arquivo = requisicao.get("nome_arquivo")
             return lidar_com_busca(nome_arquivo)
 
-        case "lista":
+        case "listar_peers":
             return lidar_com_lista()
 
         case _:
             return json.dumps({"status": "erro", "mensagem": "Tipo de mensagem desconhecido"})
 
-def lidar_com_registro(peer_id: str, arquivos: list, endereco_cliente: (str, int)) -> str:
+
+
+def lidar_com_registro(peer_id: str, arquivos: list, endereco_cliente: tuple[str, int], peer_port: int) -> str:
     """
     Registra um peer no tracker.
     """
     with peers_lock:
         peers[peer_id] = {
-            "endereco": endereco_cliente,
+            "endereco": (endereco_cliente[0], peer_port),
             "arquivos": arquivos,
             "ultima_atividade": time.time(),
+            "score": 0
         }
-    print(f"Peer {peer_id} registrado com arquivos: {arquivos}")
+
+    print(f"Peer {peer_id} registrado com arquivos: {arquivos} e porta: {peer_port}")
     return json.dumps({"status": "sucesso", "mensagem": "Peer registrado com sucesso"})
+
 
 def lidar_com_busca(nome_arquivo: str) -> str:
     """
@@ -103,10 +109,8 @@ def lidar_com_busca(nome_arquivo: str) -> str:
             if nome_arquivo in info_peer["arquivos"]
         ]
     if resultado:
-        print(f"Arquivo '{nome_arquivo}' encontrado nos peers: {resultado}")
         return json.dumps({"status": "sucesso", "peers": resultado})
     else:
-        print(f"Arquivo '{nome_arquivo}' não encontrado")
         return json.dumps({"status": "erro", "mensagem": "Arquivo não encontrado"})
 
 def lidar_com_lista() -> str:
@@ -115,7 +119,11 @@ def lidar_com_lista() -> str:
     """
     with peers_lock:
         lista_peers = {
-            peer_id: {"arquivos": info_peer["arquivos"], "endereco": info_peer["endereco"]}
+            peer_id: {
+                "arquivos": info_peer["arquivos"], 
+                "endereco": info_peer["endereco"],
+                "score": info_peer["score"]               
+                }
             for peer_id, info_peer in peers.items()
         }
     return json.dumps({"status": "sucesso", "peers": lista_peers})
@@ -134,8 +142,8 @@ def remover_peers_inativos() -> None:
             ]
             for peer_id in peers_inativos:
                 del peers[peer_id]
-                print(f"Peer {peer_id} removido por inatividade.")
-        time.sleep(30)
+                print(f"Peer {peer_id} e removido por inatividade.")
+        time.sleep(30) 
 
 if __name__ == "__main__":
     iniciar_tracker()
