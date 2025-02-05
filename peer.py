@@ -183,8 +183,7 @@ def enviar_mensagem(peer_endereco, mensagem, remetente):
             s.connect((peer_host, peer_port))
             mensagem_chat = json.dumps({"tipo": "chat", "mensagem": mensagem, "remetente": remetente})
             s.send(mensagem_chat.encode('utf-8'))
-            resposta = s.recv(1024).decode('utf-8')
-            print("Resposta do peer:", resposta)
+
         except Exception:
             print(f"Erro ao enviar mensagem para {peer_endereco}")
 
