@@ -4,4 +4,4 @@
 
 - Henrique Rodrigues Rocha - 211036061
 - Thiago Maciel - 180131699
--
+- Victor Hugo Rodrigues Fernandes - 180132041
