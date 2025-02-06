@@ -206,13 +206,6 @@ def lidar_com_requisicao(socket_cliente: socket, arquivos: list[str]) -> None:
         socket_cliente.close()
 
 
-if __name__ == '__main__':
-    id_peer = input('Digite o ID: ')
-    arquivos = input('Digite os nomes dos arquivos: ').split(',')
-    porta_peer = int(input('Porta do peer que queira usar: '))
-
-<<<<<<< HEAD
-
 def listar_arquivos_no_peers(peers):
     """
     Lista de todos os arquivos disponiveis
@@ -220,7 +213,7 @@ def listar_arquivos_no_peers(peers):
     arquivos_disponiveis = {}
     for peer_id, peer_info in peers.items():
         peer_host, peer_port = peer_info['endereco']
-        for _ in range(3):  
+        for _ in range(3):
             try:
                 with socket(AF_INET, SOCK_STREAM) as s:
                     s.connect((peer_host, peer_port))
@@ -230,75 +223,16 @@ def listar_arquivos_no_peers(peers):
                     resultado = json.loads(resposta)
                     if resultado.get("status") == "ok":
                         arquivos_disponiveis[peer_id] = resultado.get("arquivos")
-                    break  
+                    break
             except Exception:
-                print(f"Erro ao listar arquivos") 
-                time.sleep(1) 
+                print(f"Erro ao listar arquivos")
+                time.sleep(1)
     return arquivos_disponiveis
-
-
-def iniciar_peer(peer_id, arquivos, peer_port):
-    """
-    Inicia o peer e registra no tracker
-    """
-    registrar_peer(peer_id, arquivos, peer_port)
-
-    Thread(target=servidor_peer, args=(peer_id, arquivos, peer_port), daemon=True).start()
-
-    while True:
-        print("\n1. Buscar arquivo")
-        print("2. Enviar mensagem para outro peer")
-        print("3. Listar arquivos")
-        print("4. Sair")
-        opcao = input("Escolha uma opção: ")
-
-        if opcao == "1":
-            nome_arquivo = input("Nome do arquivo para buscar: ")
-            resultado = buscar_arquivo(nome_arquivo)
-            if resultado.get("status") == "sucesso":
-                print(f"Arquivo encontrado nos seguintes peers: {resultado['peers']}")
-            else:
-                print("Arquivo não encontrado.")
-                
-        elif opcao == "2":
-            endereco_peer = input("Digite o endereço do peer (IP:PORTA): ")
-            ip, porta = endereco_peer.split(':')
-            mensagem = input("Digite sua mensagem: ")
-            enviar_mensagem((ip, int(porta)), mensagem, peer_id)
-
-        elif opcao == "3":
-            resultado_peers = obter_lista_peers()
-            if resultado_peers.get("status") == "sucesso":
-                peers = resultado_peers["peers"]
-                arquivos = listar_arquivos_no_peers(peers)
-                print("\nArquivos disponíveis em todos os peers:", arquivos)
-            else:
-                print("Erro ao obter lista de peers.")
-
-        elif opcao == "4":
-            print("Encerrando peer...")
-            break
-
-def enviar_mensagem(peer_endereco, mensagem, remetente):
-    """
-    Envia mensagem para o chat de outro peer
-    """
-    peer_host, peer_port = peer_endereco
-    with socket(AF_INET, SOCK_STREAM) as s:
-        try:
-            s.connect((peer_host, peer_port))
-            mensagem_chat = json.dumps({"tipo": "chat", "mensagem": mensagem, "remetente": remetente})
-            s.send(mensagem_chat.encode('utf-8'))
-
-        except Exception:
-            print(f"Erro ao enviar mensagem para {peer_endereco}")
 
 
 if __name__ == "__main__":
     peer_id = input("Digite o ID: ")
-    arquivos = input("Digite o nome do arquivo: ").split(',')
-    peer_port = int(input("Porta do peer que queira usar:"))
-    iniciar_peer(peer_id, arquivos, peer_port)
-=======
-    iniciar_peer(id_peer, arquivos, porta_peer)
->>>>>>> 88e654d89265697bf47c823faf317f1d56c57639
+    _arquivos = input("Digite o nome do arquivo: ").split(',')
+    _peer_port = int(input("Porta do peer que queira usar:"))
+
+    iniciar_peer(peer_id, _arquivos, _peer_port)
