@@ -1,22 +1,22 @@
 from socket import *
 
 
-def criar_socket_servidor(host: str, porta: int) -> socket:
+def criar_servidor_socket(host: str, porta: int) -> socket:
     """
     Cria um socket TCP de servidor.
     :param host: O host do servidor.
     :param porta: A porta do servidor.
     :return: O socket TCP criado.
     """
-    socket_servidor = socket(AF_INET, SOCK_STREAM)
-    socket_servidor.bind((host, porta))
-    socket_servidor.listen(5)
+    servidor_socket = socket(AF_INET, SOCK_STREAM)
+    servidor_socket.bind((host, porta))
+    servidor_socket.listen(5)
 
-    return socket_servidor
+    return servidor_socket
 
 
-def criar_socket_cliente(host: str, porta: int) -> socket:
-    socket_cliente = socket(AF_INET, SOCK_STREAM)
-    socket_cliente.connect((host, porta))
+def criar_cliente_socket(host: str, porta: int) -> socket:
+    cliente_socket = socket(AF_INET, SOCK_STREAM)
+    cliente_socket.connect((host, porta))
 
-    return socket_cliente
+    return cliente_socket

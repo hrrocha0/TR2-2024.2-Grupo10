@@ -79,15 +79,15 @@ def registrar_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
     :param porta_peer: A porta de servidor do peer.
     :return: None
     """
-    with criar_socket_cliente(HOST_TRACKER, PORTA_TRACKER) as socket_cliente:
+    with criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as cliente_socket:
         requisicao = json.dumps({
             'tipo': 'registro',
             'id_peer': id_peer,
             'arquivos': arquivos,
             'porta': porta_peer
         })
-        socket_cliente.send(requisicao.encode('utf-8'))
-        resposta = socket_cliente.recv(1024).decode('utf-8')
+        cliente_socket.send(requisicao.encode('utf-8'))
+        resposta = cliente_socket.recv(1024).decode('utf-8')
 
         print(f'Resposta do tracker: {resposta}')
 
@@ -95,10 +95,10 @@ def registrar_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
 def buscar_arquivo() -> dict:
     nome_arquivo = input('Nome do arquivo para buscar: ')
 
-    with (criar_socket_cliente(HOST_TRACKER, PORTA_TRACKER) as socket_cliente):
+    with (criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as cliente_socket):
         requisicao = json.dumps({'tipo': 'busca', 'nome_arquivo': nome_arquivo})
-        socket_cliente.send(requisicao.encode('utf-8'))
-        resposta = socket_cliente.recv(1024).decode('utf-8')
+        cliente_socket.send(requisicao.encode('utf-8'))
+        resposta = cliente_socket.recv(1024).decode('utf-8')
 
         return json.loads(resposta) if resposta else {'status': 'erro', 'mensagem': 'Nenhuma resposta do tracker.'}
 
@@ -110,19 +110,19 @@ def enviar_mensagem(id_peer: str) -> dict[str, any]:
     host_peer = endereco_peer[0]
     porta_peer = int(endereco_peer[1])
 
-    with criar_socket_cliente(host_peer, porta_peer) as socket_cliente:
+    with criar_cliente_socket(host_peer, porta_peer) as cliente_socket:
         requisicao = json.dumps({'tipo': 'chat', 'mensagem': mensagem, 'remetente': id_peer})
-        socket_cliente.send(requisicao.encode('utf-8'))
-        resposta = socket_cliente.recv(1024).decode('utf-8')
+        cliente_socket.send(requisicao.encode('utf-8'))
+        resposta = cliente_socket.recv(1024).decode('utf-8')
 
         return json.loads(resposta) if resposta else {'status': 'erro', 'mensagem': 'Nenhuma resposta do peer.'}
 
 
 def obter_lista_peers() -> dict[str, any]:
-    with criar_socket_cliente(HOST_TRACKER, PORTA_TRACKER) as socket_cliente:
+    with criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as cliente_socket:
         requisicao = json.dumps({'tipo': 'listar_peers'})
-        socket_cliente.send(requisicao.encode('utf-8'))
-        resposta = socket_cliente.recv(1024).decode('utf-8')
+        cliente_socket.send(requisicao.encode('utf-8'))
+        resposta = cliente_socket.recv(1024).decode('utf-8')
 
         return json.loads(resposta) if resposta else {'status': 'erro', 'mensagem': 'Nenhuma resposta do tracker.'}
 
@@ -156,22 +156,22 @@ def servidor_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
     :return: None
     """
     try:
-        socket_servidor = criar_socket_servidor(HOST_PEER, porta_peer)
+        servidor_socket = criar_servidor_socket(HOST_PEER, porta_peer)
         print(f'ID: {id_peer}')
         print(f'Porta: {porta_peer}')
 
         while True:
-            socket_cliente, endereco_cliente = socket_servidor.accept()
-            Thread(target=lidar_com_requisicao, args=(socket_cliente, arquivos)).start()
+            cliente_socket, endereco_cliente = servidor_socket.accept()
+            Thread(target=lidar_com_requisicao, args=(cliente_socket, arquivos)).start()
 
     except IOError as e:
         print(f'Erro: {e}')
         sys.exit(1)
 
 
-def lidar_com_requisicao(socket_cliente: socket, arquivos: list[str]) -> None:
+def lidar_com_requisicao(cliente_socket: socket, arquivos: list[str]) -> None:
     try:
-        dados = socket_cliente.recv(1024).decode('utf-8')
+        dados = cliente_socket.recv(1024).decode('utf-8')
 
         if not dados:
             return
@@ -186,19 +186,19 @@ def lidar_com_requisicao(socket_cliente: socket, arquivos: list[str]) -> None:
                 print(f'Mensagem recebida de {remetente}: {mensagem}')
 
                 resposta = json.dumps({'status': 'sucesso', 'mensagem': 'Mensagem recebida.'})
-                socket_cliente.send(resposta.encode('utf-8'))
+                cliente_socket.send(resposta.encode('utf-8'))
             case 'listagem':
                 resposta = json.dumps({'status': 'sucesso', 'arquivos': arquivos})
-                socket_cliente.send(resposta.encode('utf-8'))
+                cliente_socket.send(resposta.encode('utf-8'))
             case _:
                 resposta = json.dumps({'status': 'erro', 'mensagem': 'Tipo de mensagem desconhecido.'})
-                socket_cliente.send(resposta.encode('utf-8'))
+                cliente_socket.send(resposta.encode('utf-8'))
 
     except Exception as e:
         print(f'Erro ao lidar com requisição: {e}')
 
     finally:
-        socket_cliente.close()
+        cliente_socket.close()
 
 
 if __name__ == '__main__':
