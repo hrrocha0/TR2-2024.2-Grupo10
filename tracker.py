@@ -1,7 +1,6 @@
 import json
 import sys
 import time
-import socket
 from utilidades_socket import *
 from threading import *
 
@@ -35,7 +34,9 @@ def iniciar_tracker(host: str, porta: int) -> None:
         sys.exit(1)
 
 
-def lidar_com_peer(socket_peer: socket, endereco_peer: tuple) -> None:
+def lidar_com_peer(peer_socket, endereco_peer: tuple) -> None:
+
+
     """
     Gerencia as comunicações entre tracker e peer.
     :param socket_peer: O socket do peer.
@@ -43,22 +44,22 @@ def lidar_com_peer(socket_peer: socket, endereco_peer: tuple) -> None:
     :return: None
     """
     try:
-        dados = socket_peer.recv(1024).decode('utf-8')
+        dados = peer_socket.recv(1024).decode('utf-8')
         print(f"Dados recebidos de {endereco_peer}: {dados}")  # Adicionando log
 
         if not dados:
             print(f"Conexão fechada por {endereco_peer} - Nenhum dado recebido.")
-            socket_peer.close()
+            peer_socket.close()
             return
 
         requisicao = json.loads(dados)
         print(f"Requisição decodificada: {requisicao}")  # Adicionando log
 
-        porta_peer = requisicao.get('porta', socket_peer.getpeername()[1])
+        porta_peer = requisicao.get('porta', peer_socket.getpeername()[1])
         resposta = processar_requisicao(requisicao, endereco_peer, porta_peer)
 
         print(f"Resposta: {resposta}")  # Adicionando log
-        socket_peer.send(resposta.encode('utf-8'))
+        peer_socket.send(resposta.encode('utf-8'))
 
     except json.JSONDecodeError as e:
         print(f"Erro ao decodificar JSON: {e}")
@@ -67,7 +68,7 @@ def lidar_com_peer(socket_peer: socket, endereco_peer: tuple) -> None:
     except Exception as e:
         print(f"Erro desconhecido ao lidar com peer {endereco_peer}: {e}")
     finally:
-        socket_peer.close()
+        peer_socket.close()
 
 
 def processar_requisicao(requisicao: dict, endereco_peer: tuple, porta_peer: int) -> str:
@@ -82,18 +83,42 @@ def processar_requisicao(requisicao: dict, endereco_peer: tuple, porta_peer: int
         'registro': lidar_com_registro,
         'busca': lidar_com_busca,
         'listar_peers': lidar_com_lista,
+        'atualizar_arquivos': lidar_com_atualizar_arquivos,
     }
     tipo = requisicao.get('tipo')
 
-    print(f"Tipo da requisição: {tipo}")  # Adicionando log para depuração
+    print(f"Tipo da requisição: {tipo}") 
 
     if tipo not in operacoes:
-        print(f"Tipo de requisição desconhecido: {tipo}")  # Adicionando log para depuração
+        print(f"Tipo de requisição desconhecido: {tipo}") 
         return json.dumps({'status': 'erro', 'mensagem': 'Tipo de mensagem desconhecido.'})
 
     resposta = operacoes[tipo](requisicao, endereco_peer, porta_peer)
-    print(f"Resposta processada: {resposta}")  # Adicionando log para depuração
+    print(f"Resposta processada: {resposta}")  
     return resposta
+
+def lidar_com_atualizar_arquivos(requisicao: dict, endereco_peer: tuple, porta_peer: int) -> str:
+    """
+    Atualiza a lista de arquivos de um peer já registrado.
+    :param requisicao: A requisição do peer contendo novos arquivos.
+    :param endereco_peer: O endereço do peer.
+    :param porta_peer: A porta do peer.
+    :return: Resposta JSON com status da operação.
+    """
+    id_peer = requisicao.get('id_peer')
+    novos_arquivos = requisicao.get('arquivos', [])
+
+    if not id_peer or not isinstance(novos_arquivos, list):
+        return json.dumps({'status': 'erro', 'mensagem': 'ID ou arquivos inválidos.'})
+
+    with mutex_peers:
+        if id_peer in peers:
+            peers[id_peer]['arquivos'].extend(novos_arquivos)
+            peers[id_peer]['arquivos'] = list(set(peers[id_peer]['arquivos']))  
+            peers[id_peer]['ultima_atividade'] = time.time()  
+            return json.dumps({'status': 'sucesso', 'mensagem': 'Arquivos atualizados com sucesso.'})
+        else:
+            return json.dumps({'status': 'erro', 'mensagem': 'Peer não encontrado.'})
 
 
 def lidar_com_busca(requisicao: dict, endereco_peer: tuple, porta_peer: int) -> str:
@@ -101,16 +126,15 @@ def lidar_com_busca(requisicao: dict, endereco_peer: tuple, porta_peer: int) -> 
 
     with mutex_peers:
         resultado = [
-            {'id_peer': id_peer, 'endereco': peer['endereco']}
+            {
+                'id_peer': id_peer,
+                'endereco': peer['endereco'][0], 
+                'porta': peer['endereco'][1] 
+            }
             for id_peer, peer in peers.items()
             if nome_arquivo in peer['arquivos']
         ]
     
-    if resultado:
-        print(f"Peers encontrados: {resultado}")
-    else:
-        print(f"Arquivo {nome_arquivo} não encontrado.")
-
     return json.dumps(
         {'status': 'sucesso', 'peers': resultado} if resultado else
         {'status': 'erro', 'mensagem': 'Arquivo não encontrado.'}
@@ -128,11 +152,9 @@ def lidar_com_registro(requisicao: dict, endereco_peer: tuple, porta_peer: int) 
     id_peer = requisicao.get('id_peer')
     arquivos = requisicao.get('arquivos', [])
 
-    # Verificar se o ID ou os arquivos são válidos
     if not id_peer or not isinstance(arquivos, list):
         return json.dumps({'status': 'erro', 'mensagem': 'ID ou arquivos inválidos.'})
 
-    # Permitir registro com lista de arquivos vazia
     if arquivos is None:
         arquivos = []
 
@@ -158,7 +180,7 @@ def lidar_com_lista(requisicao: dict, endereco_peer: tuple, porta_peer: int) -> 
     :param porta_peer: A porta de servidor do peer.
     :return: A mensagem de resposta.
     """
-    print(f"Solicitação de {endereco_peer} na porta {porta_peer}")  # Exemplo de log
+    print(f"Solicitação de {endereco_peer} na porta {porta_peer}") 
 
     with mutex_peers:
         lista_peers = {

@@ -38,13 +38,13 @@ def cliente_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
 
     while True:
         print('Selecione uma opção:')
-        print('1. Buscar arquivo')
+        print('1. Buscar arquivos no tracker')
         print('2. Enviar mensagem para outro peer')
-        print('3. Listar arquivos')
-        print('4. Sair')
-        print('5. Listar Peer')
-        print('6. Selecionar arquivo')
-        print('7. Baixar arquivo')
+        print('3. Listar arquivos no tracker')
+        print('4. Listar Peer ativos')
+        print('5. Selecionar arquivo para compartilhar')
+        print('6. Baixar arquivo')
+        print('7. Sair')
 
         opcao = input('Escolha uma opção: ')
 
@@ -54,12 +54,14 @@ def cliente_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
                 print(f'Arquivo encontrado nos seguintes peers: {resultado.get("peers")}')
             else:
                 print(f'Erro: {resultado.get("mensagem")}')
+
         elif opcao == '2':
             resultado = enviar_mensagem(id_peer)
             if resultado.get('status') == 'sucesso':
                print(f'Resposta do peer: {resultado.get("mensagem")}')
             else:
                 print(f'Erro: {resultado.get("mensagem")}')
+                
         elif opcao == '3':
             resultado = obter_lista_peers()
             if resultado.get('status') == 'sucesso':
@@ -67,39 +69,50 @@ def cliente_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
                 print(f'Arquivos disponíveis: {arquivos_disponiveis}')
             else:
                 print(f'Erro: {resultado.get("mensagem", "Desconhecido")}')
-        elif opcao == '4':
-            print('Encerrando peer...')
-            break
 
-        elif opcao == '5':
+        elif opcao == '4':
             resultado = obter_lista_peers()
             if resultado.get('status') == 'sucesso':
                 peers = resultado.get("peers", [])
-                if peers:
-                    print("Peers ativos:")
-                    for peer in peers:
-                        if isinstance(peer, (str, int)):
-                            print(f"Peer ID: {peer}")
-                        else:
-                            print("Peer inválido na lista.")
+            if peers:
+                print("Peers ativos:")
+                for peer_id, peer_info in peers.items():
+                    endereco = peer_info.get('endereco', [])
+                    if endereco and len(endereco) > 1:
+                        ip, porta = endereco[0], endereco[1] 
+                        print(f"Peer ID: {peer_id} | 127.0.0.1:{porta}")
+                    else:
+                        print("Peer inválido na lista.")
                 else:
-                    print("Nenhum peer ativo encontrado.")
+                    None
             else:
                 print(f'Erro: {resultado.get("mensagem")}')
 
-        elif opcao == '6':
+        elif opcao == '5':
             caminho_arquivo = selecionar_arquivo()
             if caminho_arquivo:
                 nome_arquivo = os.path.basename(caminho_arquivo)
                 arquivos.append(nome_arquivo) 
-                print(f'Arquivo "{nome_arquivo}" agora está disponível para outros peers.')
+                print(f'Arquivo "{nome_arquivo}" disponível para outros peers.')
 
+                try:
+                    with criar_socket_cliente(HOST_TRACKER, PORTA_TRACKER) as socket_cliente:
+                        requisicao = json.dumps({
+                            "tipo": "atualizar_arquivos",
+                            "id_peer": id_peer,
+                            "arquivos": [nome_arquivo]
+                        })
+                        socket_cliente.send(requisicao.encode('utf-8'))
+                        resposta = socket_cliente.recv(1024).decode('utf-8')
+                        print(json.loads(resposta).get("ERRO"))
+                except Exception as e:
+                    print(f"ERRO")
 
-        elif opcao == '7':
+        elif opcao == '6':
             arquivos_disponiveis = obter_lista_arquivos()
 
             if not arquivos_disponiveis:
-                print("Nenhum arquivo disponível para download.")
+                print("Nenhum arquivo disponível")
                 continue
 
             print("\nArquivos disponíveis para download:")
@@ -126,59 +139,13 @@ def cliente_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
 
             except (ValueError, IndexError):
                 print("Escolha inválida. Tente novamente.")
+                
+        elif opcao == '7':
+            print('Encerrando peer...')
+            break
 
         else: 
             print('Erro: operação inexistente')
-
-
-def baixar_arquivo():
-    """
-    Permite ao usuário baixar um arquivo de outro peer.
-    """
-    resultado = obter_lista_peers()
-    if resultado.get('status') != 'sucesso':
-        print(f'Erro: {resultado.get("mensagem")}')
-        return
-
-    peers = resultado.get('peers', {})
-    arquivos_disponiveis = listar_arquivos_no_peers(peers)
-
-    if not arquivos_disponiveis:
-        print('Nenhum arquivo disponível para download.')
-        return
-
-    print('Arquivos disponíveis para download:')
-    for idx, (arquivo, peer_info) in enumerate(arquivos_disponiveis.items(), start=1):
-        print(f'{idx}. {arquivo} - Peer {peer_info["id"]} (Porta {peer_info["porta"]})')
-
-    escolha = input('Digite o número do arquivo que deseja baixar: ')
-    try:
-        escolha_idx = int(escolha) - 1
-        arquivo_escolhido, peer_info = list(arquivos_disponiveis.items())[escolha_idx]
-    except (ValueError, IndexError):
-        print('Opção inválida.')
-        return
-
-    id_peer = peer_info["id"]
-    porta_peer = peer_info["porta"]
-
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST_PEER, porta_peer))
-            requisicao = json.dumps({'tipo': 'download', 'arquivo': arquivo_escolhido})
-            s.send(requisicao.encode('utf-8'))
-
-            with open(arquivo_escolhido, 'wb') as f:
-                while True:
-                    dados = s.recv(1024)
-                    if not dados:
-                        break
-                    f.write(dados)
-
-        print(f'Arquivo "{arquivo_escolhido}" baixado com sucesso!')
-
-    except Exception as e:
-        print(f'Erro ao baixar arquivo: {e}')
 
 
 
@@ -209,9 +176,10 @@ def registrar_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
             socket_cliente.send(requisicao.encode('utf-8'))
             resposta = socket_cliente.recv(1024).decode('utf-8')
             if resposta != "sucesso":
-                None             
+                None
     except Exception as e:
-        None
+        print(f"Erro ao registrar peer: {e}")
+
         
 def enviar_arquivo(socket_cliente: socket, nome_arquivo: str) -> None:
     """
@@ -227,76 +195,65 @@ def enviar_arquivo(socket_cliente: socket, nome_arquivo: str) -> None:
     except FileNotFoundError:
         print(f'Erro: Arquivo "{nome_arquivo}" não encontrado.')
 
-def baixar_arquivo(endereco_peer: tuple, nome_arquivo: str) -> None:
-    try:
-        socket_peer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        socket_peer.connect(endereco_peer)
 
-        requisicao = json.dumps({'tipo': 'download', 'nome_arquivo': nome_arquivo})
-        socket_peer.send(requisicao.encode('utf-8'))
-
-        with open(f"baixado_{nome_arquivo}", 'wb') as arquivo:
-            while True:
-                dados = socket_peer.recv(1024)
-                if not dados:
-                    break
-                arquivo.write(dados)
-
-        print(f'Arquivo "{nome_arquivo}" baixado com sucesso de {endereco_peer}.')
-    except Exception as e:
-        print(f'Erro ao baixar arquivo: {e}')
-    finally:
-        socket_peer.close()
-
-
-def baixar_arquivo_peer(tracker_socket: socket) -> None:
+def baixar_arquivo():
     """
-    Lista os arquivos disponíveis e permite que o usuário escolha um para baixar.
-    :param tracker_socket: Socket conectado ao tracker.
-    :return: None
+    Permite ao usuário baixar um arquivo de outro peer, fornecendo apenas o nome do arquivo.
     """
+    nome_arquivo = input('Digite o nome do arquivo que deseja baixar: ')
+    arquivos_disponiveis = obter_lista_arquivos()
+
+    if nome_arquivo not in arquivos_disponiveis:
+        print(f"Erro: Arquivo '{nome_arquivo}' não encontrado no tracker.")
+        return
+
+    peers_arquivo = arquivos_disponiveis[nome_arquivo]
+    print(f"Arquivo '{nome_arquivo}' encontrado nos seguintes peers:")
+
+    for i, peer in enumerate(peers_arquivo, 1):
+        print(f"{i}. ID: {peer['id']} | Porta: {peer['porta']}")
+
+    escolha_peer = input(f"Escolha o número do peer para baixar o arquivo '{nome_arquivo}': ")
     try:
-
-        requisicao = json.dumps({'tipo': 'listar_arquivos'})
-        tracker_socket.send(requisicao.encode('utf-8'))
-        
-        resposta = tracker_socket.recv(4096).decode('utf-8')
-        arquivos_disponiveis = json.loads(resposta)
-
-        if not arquivos_disponiveis:
-            print("Nenhum arquivo disponível para download.")
-            return
-
-        print("\nArquivos disponíveis:")
-        for idx, (arquivo, peers) in enumerate(arquivos_disponiveis.items()):
-            print(f"{idx + 1}. {arquivo} - Disponível em {[(p['id'], p['porta']) for p in peers]}")
-
-
-        escolha = int(input("\nDigite o número do arquivo que deseja baixar: ")) - 1
-        if escolha < 0 or escolha >= len(arquivos_disponiveis):
-            print("Escolha inválida!")
-            return
-        
-        nome_arquivo = list(arquivos_disponiveis.keys())[escolha]
-        peers_disponiveis = arquivos_disponiveis[nome_arquivo]
-
-
-        print("\nPeers disponíveis para o arquivo:")
-        for idx, peer in enumerate(peers_disponiveis):
-            print(f"{idx + 1}. ID: {peer['id']} | Porta: {peer['porta']}")
-
-        escolha_peer = int(input("\nDigite o número do peer para baixar o arquivo: ")) - 1
-        if escolha_peer < 0 or escolha_peer >= len(peers_disponiveis):
-            print("Escolha inválida!")
-            return
-
-        peer_escolhido = peers_disponiveis[escolha_peer]
-        endereco_peer = ("127.0.0.1", peer_escolhido['porta'])
-
+        escolha_peer = int(escolha_peer) - 1
+        endereco_peer = ('127.0.0.1', peers_arquivo[escolha_peer]['porta'])
         baixar_arquivo_peer(endereco_peer, nome_arquivo)
 
+    except (ValueError, IndexError):
+        print("Escolha inválida. Tente novamente.")
+
+
+
+def baixar_arquivo_peer(endereco_peer: tuple, nome_arquivo: str):
+    """
+    Conecta-se ao peer para baixar o arquivo.
+    :param endereco_peer: O endereço do peer.
+    :param nome_arquivo: O nome do arquivo a ser baixado.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(endereco_peer)
+            requisicao = json.dumps({'tipo': 'download', 'arquivo': nome_arquivo})
+            s.send(requisicao.encode('utf-8'))
+
+            resposta = s.recv(1024).decode('utf-8')
+            resposta = json.loads(resposta)
+
+            if resposta.get('status') == 'sucesso':
+                print(f"Arquivo '{nome_arquivo}' encontrado. Baixando...")
+
+                with open(nome_arquivo, 'wb') as f:
+                    while True:
+                        dados = s.recv(1024)
+                        if not dados:
+                            break
+                        f.write(dados)
+
+                print(f"Arquivo '{nome_arquivo}' baixado com sucesso!")
+            else:
+                print(f"Erro ao baixar o arquivo: {resposta.get('mensagem')}")
     except Exception as e:
-        print(f"Erro ao baixar arquivo: {e}")
+        print(f"Erro ao baixar o arquivo do peer: {e}")
 
 
 def buscar_arquivo() -> dict:
@@ -306,6 +263,7 @@ def buscar_arquivo() -> dict:
         socket_cliente.send(requisicao.encode('utf-8'))
         resposta = socket_cliente.recv(1024).decode('utf-8')
         return json.loads(resposta) if resposta else {'status': 'erro', 'mensagem': 'Nenhuma resposta do tracker.'}
+
 
 def enviar_mensagem(id_peer: str) -> dict[str, any]:
     endereco_peer = input('Digite o endereço do peer(IP:PORTA): ').split(':')
@@ -345,23 +303,22 @@ def obter_lista_arquivos():
         print(f'Erro ao obter lista de arquivos: {e}')
         return {}
 
-def listar_arquivos_no_peers(peers):
+def listar_arquivos_no_peers(peers_encontrados):
     arquivos_disponiveis = {}
 
-    if not isinstance(peers, dict):
-        print("Erro: Estrutura de peers inválida, esperado um dicionário.")
-        return {}
+    for peer_id, peer_info in peers_encontrados.items():
+        for arquivo in peer_info.get("arquivos", []):
+            if arquivo not in arquivos_disponiveis:
+                arquivos_disponiveis[arquivo] = []
+            
+            endereco = peer_info.get("endereco", [])
+            porta = endereco[1] if len(endereco) > 1 else "desconhecida"
 
-    for peer_id, peer_info in peers.items():
-        print(f"Verificando peer {peer_id} com informações {peer_info}")  
-        if "arquivos" in peer_info:
-            arquivos = peer_info.get("arquivos", [])
-            print(f"Arquivos disponíveis no peer {peer_id}: {arquivos}") 
-            for arquivo in arquivos:
-                if arquivo not in arquivos_disponiveis:
-                    arquivos_disponiveis[arquivo] = []
-                arquivos_disponiveis[arquivo].append({"id": peer_id, "porta": peer_info["porta"]})
-
+            arquivos_disponiveis[arquivo].append({
+                "id": peer_id,
+                "porta": porta
+            })
+    
     return arquivos_disponiveis
 
 
