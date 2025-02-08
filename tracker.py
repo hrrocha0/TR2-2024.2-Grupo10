@@ -18,16 +18,16 @@ def iniciar_tracker(host: str, porta: int) -> None:
     :return: None
     """
     try:
-        socket_servidor = criar_socket_servidor(host, porta)
+        servidor_socket = criar_servidor_socket(host, porta)
         print(f'Tracker ativo em {host}:{porta}...')
 
         Thread(target=remover_peers_inativos, daemon=True).start()
 
         while True:
-            socket_cliente, endereco_cliente = socket_servidor.accept()
+            cliente_socket, endereco_cliente = servidor_socket.accept()
             print(f'Nova conexão de {endereco_cliente[0]}:{endereco_cliente[1]}.')
 
-            Thread(target=lidar_com_peer, args=(socket_cliente, endereco_cliente)).start()
+            Thread(target=lidar_com_peer, args=(cliente_socket, endereco_cliente)).start()
 
     except Exception as e:
         print(f'Erro: {e}')
