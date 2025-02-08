@@ -3,8 +3,8 @@ import math
 import hashlib
 
 
-def count_blocks(file_name: str, file_size: int, peer_num: int,
-                 block_size: int = 100000000, folder: str = "files/") -> list:
+def count_blocks(file_size: int, peer_num: int,
+                 block_size: int = 100000000) -> list:
     """
     Determina quantos e quais blocos do arquivo cada peer deve criar para um
     dado tamanho de bloco.
@@ -193,13 +193,13 @@ def test1():
     """
     Teste de "count_blocks", "create_blocks" e "combine_blocks".
     """
-    file_n = input("\nInsira o nome de um arquivo (no subdiretório 'file').\n")
+    file_n = input("\nInsira o nome de um arquivo (no subdiretório 'files').\n")
     file_s = os.path.getsize("files/" + file_n)
     print("Tamanho do arquivo (bytes):\n" + str(file_s))
     peer_n = int(input("Insira um número de peers (1 a 4, normalmente).\n"))
     block_s = int(input("E um tamanho de bloco (bytes, e.g. 1.000.000 = 1MB).\n"))
     
-    assignments = count_blocks(file_n, file_s, peer_n, block_s)
+    assignments = count_blocks(file_s, peer_n, block_s)
 
     print("\nLista de atribuições para peers (bloco no qual começa, nº de blocos):")
     print(assignments)
@@ -228,7 +228,7 @@ def test2():
     """
     Teste de "calculate_checksum", "append_checksum" e "extract_checksum".
     """
-    file_n = input("\nInsira o nome de um arquivo (no subdiretório 'file').\n")
+    file_n = input("\nInsira o nome de um arquivo (no subdiretório 'files').\n")
 
     checksum = calculate_checksum(file_n)
 
