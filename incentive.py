@@ -32,9 +32,7 @@ def incentive_calculation(folder: str = "files/") -> int:
 
     # Cálculo de incentivo.
     peer_num += (0.1 * file_num)
-    print(peer_num)
     peer_num += (0.0000001 * byte_total)
-    print(peer_num)
 
     # Caso a quantidade de peers seja maior do que o limite.
     if peer_num > 4:
