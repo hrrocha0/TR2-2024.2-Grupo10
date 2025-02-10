@@ -40,7 +40,7 @@ def cliente_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
     while True:
         print('Selecione uma opção:')
         print('1. Buscar arquivos no tracker')
-        print('2. iniciar char com outro peer')
+        print('2. Enviar mensagem para outro peer')
         print('3. Listar arquivos no tracker')
         print('4. Listar Peer ativos')
         print('5. Selecionar arquivo para compartilhar')
@@ -57,16 +57,8 @@ def cliente_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
                 print(f'Erro: {resultado.get("mensagem")}')
 
         elif opcao == '2':
-<<<<<<< HEAD
             enviar_mensagem(id_peer)
 
-=======
-            peer_id_destino = input('Digite o ID do peer para iniciar o chat: ')
-            endereco_peer = input('Digite o endereço do peer (IP:PORTA): ').split(':')
-            Thread(target=chat_peer, args=(peer_id_destino, endereco_peer[0], int(endereco_peer[1]), id_peer), daemon=True).start()
-
-                
->>>>>>> teste
         elif opcao == '3':
             resultado = obter_lista_peers()
             if resultado.get('status') == 'sucesso':
@@ -101,14 +93,14 @@ def cliente_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
                 print(f'Arquivo "{nome_arquivo}" disponível para outros peers.')
 
                 try:
-                    with criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as cliente_socket:
+                    with criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as socket_cliente:
                         requisicao = json.dumps({
                             "tipo": "atualizar_arquivos",
                             "id_peer": id_peer,
                             "arquivos": [nome_arquivo]
                         })
-                        cliente_socket.send(requisicao.encode('utf-8'))
-                        resposta = cliente_socket.recv(1024).decode('utf-8')
+                        socket_cliente.send(requisicao.encode('utf-8'))
+                        resposta = socket_cliente.recv(1024).decode('utf-8')
                         print(json.loads(resposta).get("ERRO"))
                 except Exception as e:
                     print(f"ERRO")
@@ -162,45 +154,7 @@ def selecionar_arquivo():
     return caminho_arquivo if caminho_arquivo else None
 
 
-<<<<<<< HEAD
-=======
-def chat_peer(peer_id_destino: str, host_peer: str, porta_peer: int, id_peer: str) -> None:
-    """
-    Permite o chat direto entre dois peers.
-    :param peer_id_destino: O ID do peer de destino.
-    :param host_peer: O IP do peer de destino.
-    :param porta_peer: A porta do peer de destino.
-    :param id_peer: O ID do peer atual.
-    :return: None
-    """
-    try:
-        with socket(AF_INET, SOCK_STREAM) as s:
-            s.connect((host_peer, porta_peer))
 
-            s.sendall(json.dumps({"tipo": "chat", "remetente": id_peer, "mensagem": "Conexão estabelecida."}).encode('utf-8'))
-
-            while True:
-                dados = s.recv(1024).decode('utf-8')
-                if not dados:
-                    print("Conexão encerrada pelo peer.")
-                    break
-                mensagem_recebida = json.loads(dados)
-                print(f'{peer_id_destino}: {mensagem_recebida["mensagem"]}')
-
-                mensagem = input(f'{id_peer} (Digite sua mensagem): ')
-                if mensagem.lower() == 'sair':
-                    print('Saindo do chat...')
-                    break
-                
-                requisicao = json.dumps({'tipo': 'chat', 'mensagem': mensagem, 'remetente': id_peer})
-                s.send(requisicao.encode('utf-8'))
-                
-    except Exception as e:
-        print(f'Erro no chat com o peer {peer_id_destino}: {e}')
-
-
-
->>>>>>> teste
 def registrar_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
     """
     Registra um peer no tracker.
@@ -210,36 +164,31 @@ def registrar_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
     :return: None
     """
     try:
-        with criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as cliente_socket:
+        with criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as socket_cliente:
             requisicao = json.dumps({
                 'tipo': 'registro',
                 'id_peer': id_peer,
                 'arquivos': arquivos,
                 'porta': porta_peer
             })
-            cliente_socket.send(requisicao.encode('utf-8'))
-            resposta = cliente_socket.recv(1024).decode('utf-8')
+            socket_cliente.send(requisicao.encode('utf-8'))
+            resposta = socket_cliente.recv(1024).decode('utf-8')
             if resposta != "sucesso":
                 None
     except Exception as e:
         print(f"Erro ao registrar peer: {e}")
 
-<<<<<<< HEAD
 
 def enviar_arquivo(socket_cliente: socket, nome_arquivo: str) -> None:
-=======
-        
-def enviar_arquivo(cliente_socket: socket, nome_arquivo: str) -> None:
->>>>>>> teste
     """
     Envia um arquivo para o peer que solicitou o download.
-    :param cliente_socket: Socket do cliente solicitante.
+    :param socket_cliente: Socket do cliente solicitante.
     :param nome_arquivo: Nome do arquivo a ser enviado.
     :return: None
     """
     try:
         with open(nome_arquivo, 'rb') as arquivo:
-            cliente_socket.sendall(arquivo.read())
+            socket_cliente.sendall(arquivo.read())
         print(f'Arquivo "{nome_arquivo}" enviado com sucesso.')
     except FileNotFoundError:
         print(f'Erro: Arquivo "{nome_arquivo}" não encontrado.')
@@ -279,7 +228,7 @@ def baixar_arquivo_peer(endereco_peer: tuple, nome_arquivo: str):
     :param nome_arquivo: O nome do arquivo a ser baixado.
     """
     try:
-        with socket(AF_INET, SOCK_STREAM) as s:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(endereco_peer)
             requisicao = json.dumps({'tipo': 'download', 'arquivo': nome_arquivo})
             s.send(requisicao.encode('utf-8'))
@@ -306,14 +255,13 @@ def baixar_arquivo_peer(endereco_peer: tuple, nome_arquivo: str):
 
 def buscar_arquivo() -> dict:
     nome_arquivo = input('Nome do arquivo para buscar: ')
-    with (criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as cliente_socket):
+    with (criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as socket_cliente):
         requisicao = json.dumps({'tipo': 'busca', 'nome_arquivo': nome_arquivo})
-        cliente_socket.send(requisicao.encode('utf-8'))
-        resposta = cliente_socket.recv(1024).decode('utf-8')
+        socket_cliente.send(requisicao.encode('utf-8'))
+        resposta = socket_cliente.recv(1024).decode('utf-8')
         return json.loads(resposta) if resposta else {'status': 'erro', 'mensagem': 'Nenhuma resposta do tracker.'}
 
 
-<<<<<<< HEAD
 def enviar_mensagem(id_peer: str) -> None:
     endereco_peer = input('Digite o endereço do peer(IP:PORTA): ').split(':')
 
@@ -326,7 +274,7 @@ def enviar_mensagem(id_peer: str) -> None:
         if mensagem == '':
             return
 
-        with criar_socket_cliente(host_peer, porta_peer) as socket_cliente:
+        with criar_cliente_socket(host_peer, porta_peer) as socket_cliente:
             requisicao = json.dumps({'tipo': 'chat', 'mensagem': mensagem, 'remetente': id_peer})
             socket_cliente.send(requisicao.encode('utf-8'))
             resposta = json.loads(socket_cliente.recv(1024).decode('utf-8'))
@@ -351,34 +299,12 @@ def enviar_mensagem(id_peer: str) -> None:
 #
 #            return json.loads(resposta) if resposta else {'status': 'erro', 'mensagem': 'Nenhuma resposta do peer.'}
 
-=======
-def enviar_mensagem(id_peer: str, host_destino: str, porta_destino: int) -> None:
-    """
-    Envia mensagens para outro peer.
-    :param id_peer: O ID do peer atual.
-    :param host_destino: O IP do peer de destino.
-    :param porta_destino: A porta do peer de destino.
-    :return: None
-    """
-    try:
-        with socket(AF_INET, SOCK_STREAM) as s:
-            s.connect((host_destino, porta_destino))
-            print(f"{id_peer} conectado ao peer {host_destino}:{porta_destino}")
-
-            while True:
-                mensagem = input(f"{id_peer} (Digite sua mensagem ou 'sair' para encerrar): ")
-                s.sendall(mensagem.encode('utf-8'))
-                if mensagem.lower() == 'sair':
-                    break
-    except Exception as e:
-        print(f"Erro ao enviar mensagem: {e}")
->>>>>>> teste
 
 def obter_lista_peers() -> dict[str, any]:
-    with criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as cliente_socket:
+    with criar_cliente_socket(HOST_TRACKER, PORTA_TRACKER) as socket_cliente:
         requisicao = json.dumps({'tipo': 'listar_peers'})
-        cliente_socket.send(requisicao.encode('utf-8'))
-        resposta = cliente_socket.recv(1024).decode('utf-8')
+        socket_cliente.send(requisicao.encode('utf-8'))
+        resposta = socket_cliente.recv(1024).decode('utf-8')
         return json.loads(resposta) if resposta else {'status': 'erro', 'mensagem': 'Nenhuma resposta do tracker.'}
 
 
@@ -388,7 +314,7 @@ def obter_lista_arquivos():
     Retorna um dicionário onde as chaves são os arquivos e os valores são os peers que os possuem.
     """
     try:
-        with socket(AF_INET, SOCK_STREAM) as s:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((HOST_TRACKER, PORTA_TRACKER))
             mensagem = json.dumps({"tipo": "listar_arquivos"})
             s.send(mensagem.encode('utf-8'))
@@ -427,52 +353,22 @@ def servidor_peer(id_peer: str, arquivos: list[str], porta_peer: int) -> None:
     :return: None
     """
     try:
-        servidor_socket = criar_servidor_socket(HOST_PEER, porta_peer)
+        socket_servidor = criar_servidor_socket(HOST_PEER, porta_peer)
         print(f'ID: {id_peer}')
         print(f'Porta: {porta_peer}')
 
         while True:
-            cliente_socket, endereco_cliente = servidor_socket.accept()
-            Thread(target=lidar_com_requisicao, args=(cliente_socket, arquivos)).start()
+            socket_cliente, endereco_cliente = socket_servidor.accept()
+            Thread(target=lidar_com_requisicao, args=(socket_cliente, arquivos)).start()
 
     except IOError as e:
         print(f'Erro: {e}')
         sys.exit(1)
 
-def servidor_chat(id_peer: str, host: str, porta: int) -> None:
-    """
-    Servidor de chat que aguarda mensagens de outros peers.
-    :param id_peer: O ID do peer atual.
-    :param host: O IP do peer (geralmente localhost para este caso).
-    :param porta: A porta para o servidor de chat.
-    :return: None
-    """
-    try:
-        with socket(AF_INET, SOCK_STREAM) as s:
-            s.bind((host, porta))
-            s.listen(1)  # Aceitar apenas uma conexão por vez.
-            print(f'{id_peer} - Servidor de chat iniciado na porta {porta}')
-            
-            while True:
-                cliente_socket, _ = s.accept()
-                with cliente_socket:
-                    print("Conexão estabelecida com o peer.")
-                    while True:
-                        mensagem = cliente_socket.recv(1024).decode('utf-8')
-                        if not mensagem:
-                            break  # Se a conexão for fechada, sai do loop.
-                        print(f"Mensagem recebida: {mensagem}")
-                        
-                        # Aguardando a próxima mensagem
-                        if mensagem.lower() == 'sair':
-                            print(f"{id_peer} saiu do chat.")
-                            break
-    except Exception as e:
-        print(f"Erro no servidor de chat: {e}")
 
-def lidar_com_requisicao(cliente_socket: socket, arquivos: list[str]) -> None:
+def lidar_com_requisicao(socket_cliente: socket, arquivos: list[str]) -> None:
     try:
-        dados = cliente_socket.recv(1024).decode('utf-8')
+        dados = socket_cliente.recv(1024).decode('utf-8')
 
         if not dados:
             print("Conexão fechada pelo cliente.")
@@ -488,7 +384,6 @@ def lidar_com_requisicao(cliente_socket: socket, arquivos: list[str]) -> None:
 
                 print(f'Mensagem recebida de {remetente}: {mensagem}')
                 resposta = {'status': 'sucesso', 'mensagem': 'Mensagem recebida.'}
-                cliente_socket.send(json.dumps(resposta).encode('utf-8'))
 
             case 'listagem':
                 resposta = {'status': 'sucesso', 'arquivos': arquivos}
@@ -501,26 +396,26 @@ def lidar_com_requisicao(cliente_socket: socket, arquivos: list[str]) -> None:
                         conteudo = f.read()
 
                     resposta = {'status': 'sucesso', 'mensagem': 'Enviando arquivo.', 'tamanho': len(conteudo)}
-                    cliente_socket.send(json.dumps(resposta).encode('utf-8'))
+                    socket_cliente.send(json.dumps(resposta).encode('utf-8'))
 
-                    cliente_socket.sendall(conteudo)
+                    socket_cliente.sendall(conteudo)
                     print(f'Arquivo "{nome_arquivo}" enviado com sucesso.')
                 else:
                     resposta = {'status': 'erro', 'mensagem': 'Arquivo não encontrado.'}
-                    cliente_socket.send(json.dumps(resposta).encode('utf-8'))
+                    socket_cliente.send(json.dumps(resposta).encode('utf-8'))
 
             case _:
                 resposta = {'status': 'erro', 'mensagem': f'Tipo de mensagem desconhecido: {tipo_requisicao}'}
 
         if tipo_requisicao != 'download':
-            cliente_socket.send(json.dumps(resposta).encode('utf-8'))
+            socket_cliente.send(json.dumps(resposta).encode('utf-8'))
 
     except json.JSONDecodeError:
         print("Erro ao decodificar JSON da requisição.")
     except Exception as e:
         print(f'Erro ao lidar com requisição: {e}')
     finally:
-        cliente_socket.close()
+        socket_cliente.close()
 
 
 if __name__ == '__main__':
