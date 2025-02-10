@@ -3,9 +3,10 @@ import sys
 import time
 from utilidades_socket import *
 from threading import *
+import os
 
 HOST_TRACKER = '127.0.0.1'
-PORTA_TRACKER = 8001
+PORTA_TRACKER = 8000
 
 peers = {}
 peers_ativos = {}
@@ -32,6 +33,65 @@ def iniciar_tracker(host: str, porta: int) -> None:
     except Exception as e:
         print(f'Erro: {e}')
         sys.exit(1)
+
+def handle_request(cliente_socket):
+    """
+    Processa as requisições do cliente.
+    """
+    try:
+        data = cliente_socket.recv(1024).decode()
+        requisicao = json.loads(data)
+        tipo = requisicao.get("tipo")
+        
+        if tipo == "busca":
+            nome_arquivo = requisicao.get("nome_arquivo")
+            peers_que_tem_arquivo = buscar_arquivo_peers(nome_arquivo)
+            
+            if peers_que_tem_arquivo:
+                resposta = json.dumps(peers_que_tem_arquivo)
+            else:
+                resposta = json.dumps({"status": "erro", "mensagem": "Nenhum peer encontrado com esse arquivo."})
+
+        elif tipo == "transferencia":
+            # Opção para transferência de arquivos
+            file_name = requisicao.get('nome_arquivo')
+            tamanho_arquivo = os.path.getsize(file_name) if os.path.exists(file_name) else 0
+            resposta = json.dumps({"status": "sucesso", "tamanho_arquivo": tamanho_arquivo})
+        
+        else:
+            resposta = json.dumps({"status": "erro", "mensagem": "Tipo de requisição desconhecido."})
+        
+        cliente_socket.send(resposta.encode('utf-8'))
+    except Exception as e:
+        print(f"Erro ao processar requisição: {e}")
+    finally:
+        cliente_socket.close()
+
+
+def buscar_arquivo_peers(nome_arquivo):
+    """
+    Busca os peers que possuem o arquivo no tracker.
+    """
+    peers_que_tem_arquivo = []
+    for peers_id, peer_info in peers.items():
+        if nome_arquivo in peer_info["arquivos"]:
+            peers_que_tem_arquivo.append(peer_info)
+    
+    return peers_que_tem_arquivo
+
+
+
+def criar_servidor_socket(host: str, porta: int) -> socket:
+    """
+    Cria o socket do servidor para o tracker.
+    :param host: Endereço do servidor (ex: '127.0.0.1').
+    :param porta: Porta onde o tracker irá escutar.
+    :return: Socket configurado para aceitar conexões.
+    """
+    servidor_socket = socket(AF_INET, SOCK_STREAM)
+    servidor_socket.bind((host, porta))
+    servidor_socket.listen(5)
+    return servidor_socket
 
 
 def lidar_com_peer(peer_socket, endereco_peer: tuple) -> None:
